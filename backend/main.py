@@ -1,4 +1,5 @@
-
+import os
+import pickle
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -6,56 +7,85 @@ from typing import List
 
 app = FastAPI(
     title="Medical Diagnosis Assistant API",
-    description="A prototype API for preliminary symptom analysis.",
-    version="0.1.0"
+    description="An ML-powered API for preliminary symptom analysis.",
+    version="1.0.0"
 )
 
-# Enable CORS so your frontend (localhost:5173) can communicate with the backend
+# Enable CORS for frontend connection
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Define the structure of the incoming user request
 class SymptomRequest(BaseModel):
     symptoms: List[str]
     days_active: int
 
-# Root endpoint to check if the API is running
+# Global variables to hold our ML components
+model = None
+vectorizer = None
+
+# Load the trained model when the API starts up
+@app.on_event("startup")
+def load_ml_model():
+    global model, vectorizer
+    model_path = 'models/symptom_model.pkl'
+    vectorizer_path = 'models/vectorizer.pkl'
+    
+    if os.path.exists(model_path) and os.path.exists(vectorizer_path):
+        with open(model_path, 'rb') as f:
+            model = pickle.load(f)
+        with open(vectorizer_path, 'rb') as f:
+            vectorizer = pickle.load(f)
+        print("🤖 Machine Learning Model loaded successfully!")
+    else:
+        print("⚠️ Model files not found. Run models/train.py first to generate them.")
+
 @app.get("/")
 def read_root():
-    return {"status": "online", "message": "Medical Diagnosis Assistant API is running"}
+    return {
+        "status": "online", 
+        "model_loaded": model is not None,
+        "message": "Medical Diagnosis Assistant API is running"
+    }
 
-# Analysis endpoint (Mock logic for prototyping)
 @app.post("/api/analyze")
 def analyze_symptoms(request: SymptomRequest):
     if not request.symptoms:
         raise HTTPException(status_code=400, detail="Symptom list cannot be empty")
     
-    # Normalize inputs to lowercase for basic matching
-    symptoms_lower = [s.lower() for s in request.symptoms]
+    # If the model hasn't been trained/saved yet, fallback gracefully
+    if model is None or vectorizer is None:
+        return {
+            "analysis": {
+                "insights": ["Model is in training mode. Logged: " + ", ".join(request.symptoms)],
+                "urgency_level": "low",
+                "disclaimer": "Fallback system active. Please train the ML model."
+            }
+        }
     
-    # Placeholder rule-based engine before we integrate real ML models
-    preliminary_insights = []
+    # 1. Prepare input text by joining symptoms into a single string space-separated
+    input_text = " ".join([s.lower().strip() for s in request.symptoms])
+    
+    # 2. Transform the text using our vectorizer and predict using our model
+    input_vector = vectorizer.transform([input_text])
+    prediction = model.predict(input_vector)[0]
+    
+    # 3. Handle urgency scaling based on duration or specific high-risk triggers
     urgency = "low"
-    
-    if "fever" in symptoms_lower or "cough" in symptoms_lower:
-        preliminary_insights.append("Possible mild respiratory infection.")
-    if "headache" in symptoms_lower and request.days_active > 3:
-        preliminary_insights.append("Persistent headache detected. Monitor hydration and screen time.")
+    if request.days_active > 5 or "stiff neck" in input_text or "shortness of breath" in input_text:
         urgency = "medium"
-    
-    # Fallback if no rules match
-    if not preliminary_insights:
-        preliminary_insights.append("Symptoms logged. General fatigue or minor strain.")
+    if "high risk" in prediction.lower() or request.days_active > 10:
+        urgency = "high"
 
     return {
         "analysis": {
-            "insights": preliminary_insights,
+            "insights": [f"Based on our statistical pattern matching, your symptoms align closely with: {prediction}."],
             "urgency_level": urgency,
-            "disclaimer": "This is a machine-generated prototype insight. Consult a doctor."
+            "disclaimer": "This is an automated machine learning insight. It is not an alternative to real clinical consultation."
         }
-    }
+                                                                               }
+    
