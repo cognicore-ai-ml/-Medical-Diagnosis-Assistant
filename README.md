@@ -31,15 +31,18 @@ The repository is organized as a monorepo split into modular components:
    cd medical-diagnosis-assistant
 
 
+
+### 📡 Backend Setup
+
+```bash
 cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows use: venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload
+```
 
-cd ../frontend
-npm install
-npm run dev
+
 
 
    
