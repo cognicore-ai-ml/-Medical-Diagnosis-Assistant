@@ -29,4 +29,17 @@ The repository is organized as a monorepo split into modular components:
    ```bash
    git clone [https://github.com/YOUR_USERNAME/medical-diagnosis-assistant.git](https://github.com/YOUR_USERNAME/medical-diagnosis-assistant.git)
    cd medical-diagnosis-assistant
+
+
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload
+
+cd ../frontend
+npm install
+npm run dev
+
+
    
