@@ -4,3 +4,7 @@ uvicorn
 
 # Data Validation
 pydantic
+
+# Machine Learning Engine
+scikit-learn
+
